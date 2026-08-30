@@ -11,6 +11,10 @@ export class DocumentLoader {
     const documents: Document[] = [];
 
     for (const file of files) {
+      if (!file.endsWith(".txt")) {
+        continue;
+      }
+
       const filePath = path.join(this.dataDirectory, file);
 
       const content = await readFile(filePath, "utf-8");
