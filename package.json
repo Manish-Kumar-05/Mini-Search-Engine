@@ -1,0 +1,21 @@
+{
+  "name": "mini-search-engine",
+  "version": "1.0.0",
+  "description": "A mini search engine built from scratch with TypeScript",
+  "main": "index.js",
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "build": "tsc",
+    "start": "node dist/main.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "devDependencies": {
+    "@types/node": "^26.4.0",
+    "prettier": "^3.9.6",
+    "tsx": "^4.23.13",
+    "typescript": "^7.0.2"
+  }
+}
