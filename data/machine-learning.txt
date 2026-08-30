@@ -1,0 +1,2 @@
+Machine learning allows computers to learn patterns from data.
+Python is widely used for machine learning and data science.

@@ -8,6 +8,7 @@
 
     "target": "ES2025",
     "strict": true,
+    "types": ["node"], // tells TypeScript about Node's APIs
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,

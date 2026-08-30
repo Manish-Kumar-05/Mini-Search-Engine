@@ -1,0 +1,2 @@
+TypeScript is a programming language built on top of JavaScript.
+TypeScript adds static typing and is commonly used for backend and frontend development.

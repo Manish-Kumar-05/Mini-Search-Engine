@@ -1,0 +1,2 @@
+Databases are used to store and retrieve data.
+PostgreSQL and MySQL are popular relational database systems.
