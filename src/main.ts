@@ -2,20 +2,37 @@ import path from "node:path";
 import { DocumentLoader } from "./document-loader.js";
 import { tokenizer } from "./tokenizer.js";
 import { normalizeToken, normalizeTokens } from "./normalizer.js";
+import { InvertedIndex } from "./inverted-index.js";
+import { removeStopWords } from "./stop-words.js";
+import { SearchEngine } from "./search-engine.js";
 
 const dataDirectory = path.join(process.cwd(), "data");
 
 const loader = new DocumentLoader(dataDirectory);
 
 const documents = await loader.loadDocuments();
+const index = new InvertedIndex();
 
 for (const document of documents) {
   const tokens = tokenizer(document.content);
-  const normalized = normalizeTokens(tokens);
 
-  console.log(document.name);
-  console.log(tokens);
-  console.log(normalized);
+  const normalizedTokens = normalizeTokens(tokens);
+
+  const filteredTokens = removeStopWords(normalizedTokens);
+
+  index.addDocument(document.id, filteredTokens);
 }
+
+const searchEngine = new SearchEngine(index);
+
+console.log(searchEngine.search("python"));
+console.log(searchEngine.search("typescript"));
+console.log(searchEngine.search("Manish"));
+console.log(searchEngine.search("   "));
+
+// console.log(index.getDocuments("python"));
+// console.log(index.getDocuments("programming"));
+// console.log(index.getDocuments("typescript"));
+// console.log(index.getDocuments("is"));
 
 // console.log(documents);
