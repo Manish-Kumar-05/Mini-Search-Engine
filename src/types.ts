@@ -3,3 +3,8 @@ export interface Document {
   name: string;
   content: string;
 }
+
+export interface SearchResult {
+  documentId: string;
+  score: number;
+}

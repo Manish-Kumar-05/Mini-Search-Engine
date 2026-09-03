@@ -22,19 +22,24 @@ for (const document of documents) {
 
   index.addDocument(document.id, filteredTokens);
 }
+console.log(index.getTermFrequency("python", "python.txt"));
+
+console.log(index.getTermFrequency("python", "machine-learning.txt"));
 
 const searchEngine = new SearchEngine(index);
 
-// console.log(searchEngine.search("python machine"));
+console.log(searchEngine.search("python"));
 
-// console.log(searchEngine.search("python machine learning"));
+console.log(searchEngine.search("python AND machine"));
+
+console.log(searchEngine.search("python OR javascript"));
+
+console.log(searchEngine.search("python NOT machine"));
+
 console.log(searchEngine.search("Manish"));
 console.log(searchEngine.search("   "));
 
-console.log(searchEngine.search("python"));
-console.log(searchEngine.search("python AND machine"));
-console.log(searchEngine.search("python OR javascript"));
-console.log(searchEngine.search("python NOT machine"));
+console.log(searchEngine.searchRanked("python"));
 
 // console.log(index.getDocuments("python"));
 // console.log(index.getDocuments("programming"));
