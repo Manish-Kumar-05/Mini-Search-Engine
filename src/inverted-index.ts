@@ -42,4 +42,22 @@ export class InvertedIndex {
   getDocumentLength(documentId: string): number {
     return this.documentLengths.get(documentId) ?? 0;
   }
+
+  getTerms(): string[] {
+    return [...this.index.keys()];
+  }
+
+  getAverageDocumentLength(): number {
+    if (this.documentCount === 0) {
+      return 0;
+    }
+
+    let totalLength = 0;
+
+    for (const length of this.documentLengths.values()) {
+      totalLength += length;
+    }
+
+    return totalLength / this.documentCount;
+  }
 }

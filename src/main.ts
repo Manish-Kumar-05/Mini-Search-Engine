@@ -5,6 +5,8 @@ import { normalizeToken, normalizeTokens } from "./normalizer.js";
 import { InvertedIndex } from "./inverted-index.js";
 import { removeStopWords } from "./stop-words.js";
 import { SearchEngine } from "./search-engine.js";
+import { precisionAtK } from "./evaluation.js";
+import { QueryProcessor } from "./query-processor.js";
 
 const dataDirectory = path.join(process.cwd(), "data");
 
@@ -22,26 +24,71 @@ for (const document of documents) {
 
   index.addDocument(document.id, filteredTokens);
 }
-// console.log(index.getTermFrequency("python", "python.txt"));
-
-// console.log(index.getTermFrequency("python", "machine-learning.txt"));
 
 const searchEngine = new SearchEngine(index);
-console.log(searchEngine.searchRanked("python"));
 
-console.log(searchEngine.searchRanked("python machine"));
+const evaluationQueries = [
+  {
+    query: "python machine learning",
+    relevantDocuments: ["python.txt", "machine-learning.txt"],
+  },
+  {
+    query: "javascript programming",
+    relevantDocuments: ["javascript.txt", "typescript.txt"],
+  },
+  {
+    query: "database data",
+    relevantDocuments: ["databases.txt"],
+  },
+];
 
-console.log(searchEngine.searchRanked("python machine learning"));
+// for (const evaluation of evaluationQueries) {
+//   const tfidfResults = searchEngine.searchRanked(evaluation.query);
 
-console.log(index.getDocumentLength("python.txt"));
+//   const bm25Results = searchEngine.searchBM25(evaluation.query);
 
-console.log(index.getDocumentLength("machine-learning.txt"));
+//   const tfidfPrecision = precisionAtK(
+//     tfidfResults,
+//     evaluation.relevantDocuments,
+//     3
+//   );
 
-import { cosineSimilarity } from "./cosine-similarity.js";
+//   const bm25Precision = precisionAtK(
+//     bm25Results,
+//     evaluation.relevantDocuments,
+//     3
+//   );
 
-console.log(cosineSimilarity([1, 1], [1, 1]));
+//   console.log("\nQuery:", evaluation.query);
 
-console.log(cosineSimilarity([1, 0], [1, 1]));
+//   console.log("TF-IDF:", tfidfResults);
+
+//   console.log("TF-IDF Precision@3:", tfidfPrecision);
+
+//   console.log("BM25:", bm25Results);
+
+//   console.log("BM25 Precision@3:", bm25Precision);
+// }
+
+const queryProcessor = new QueryProcessor();
+
+console.log(queryProcessor.process("Python, MACHINE learning!"));
+
+// console.log(searchEngine.searchRanked("python"));
+
+// console.log(searchEngine.searchRanked("python machine"));
+
+// console.log(searchEngine.searchRanked("python machine learning"));
+
+// console.log("BM25:");
+
+// console.log(searchEngine.searchBM25("python machine"));
+
+// console.log(searchEngine.searchBM25("python machine learning"));
+
+// console.log(index.getDocumentLength("python.txt"));
+
+// console.log(index.getDocumentLength("machine-learning.txt"));
 
 // console.log(searchEngine.searchRanked("javascript database python"));
 
