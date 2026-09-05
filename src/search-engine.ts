@@ -68,12 +68,7 @@ export class SearchEngine {
   // --------------------------------
 
   searchRanked(query: string): SearchResult[] {
-    const tokens = tokenizer(query);
-
-    const normalizedTokens = normalizeTokens(tokens);
-
-    const terms = removeStopWords(normalizedTokens);
-
+    const terms = this.queryProcessor.process(query);
     if (terms.length === 0) {
       return [];
     }
@@ -174,11 +169,7 @@ export class SearchEngine {
   }
 
   searchBM25(query: string): SearchResult[] {
-    const tokens = tokenizer(query);
-
-    const normalizedTokens = normalizeTokens(tokens);
-
-    const terms = removeStopWords(normalizedTokens);
+    const terms = this.queryProcessor.process(query);
 
     if (terms.length === 0) {
       return [];
