@@ -7,6 +7,8 @@ import { Tfidf } from "./tf-idf.js";
 import { cosineSimilarity } from "./cosine-similarity.js";
 import { BM25 } from "./bm25.js";
 import { QueryProcessor } from "./query-processor.js";
+import { QueryNode, QueryParser } from "./query-parser.js";
+import { PositionalIndex } from "./positional-index.js";
 
 export class SearchEngine {
   private readonly tfidf: Tfidf;
@@ -15,11 +17,16 @@ export class SearchEngine {
 
   private readonly queryProcessor: QueryProcessor;
 
-  constructor(private readonly index: InvertedIndex) {
+  private readonly queryParser: QueryParser;
+
+  constructor(
+    private readonly index: InvertedIndex,
+    private readonly positionalIndex: PositionalIndex
+  ) {
     this.tfidf = new Tfidf(index);
     this.bm25 = new BM25(index);
-
     this.queryProcessor = new QueryProcessor();
+    this.queryParser = new QueryParser();
   }
 
   // --------------------------------
@@ -27,40 +34,13 @@ export class SearchEngine {
   // --------------------------------
 
   search(query: string): string[] {
-    const parts = query.trim().split(/\s+/);
-
-    if (parts.length === 0 || parts[0] === "") {
+    if (!query.trim()) {
       return [];
     }
 
-    // Single term
-    if (parts.length === 1) {
-      return [...this.getDocumentsForTerm(parts[0])];
-    }
+    const queryNode = this.queryParser.parse(query);
 
-    if (parts.length !== 3) {
-      throw new Error("Invalid query. Use: term OPERATOR term");
-    }
-
-    const left = this.getDocumentsForTerm(parts[0]);
-
-    const operator = parts[1].toUpperCase();
-
-    const right = this.getDocumentsForTerm(parts[2]);
-
-    switch (operator) {
-      case "AND":
-        return [...this.intersection(left, right)];
-
-      case "OR":
-        return [...this.union(left, right)];
-
-      case "NOT":
-        return [...this.difference(left, right)];
-
-      default:
-        throw new Error("Invalid query. Use: term OPERATOR term");
-    }
+    return [...this.evaluateQuery(queryNode)];
   }
 
   // --------------------------------
@@ -199,5 +179,90 @@ export class SearchEngine {
     }
 
     return results.sort((a, b) => b.score - a.score);
+  }
+
+  private getAllDocuments(): Set<string> {
+    const documents = new Set<string>();
+
+    for (const term of this.index.getTerms()) {
+      for (const documentId of this.index.getDocuments(term)) {
+        documents.add(documentId);
+      }
+    }
+
+    return documents;
+  }
+
+  private evaluateQuery(node: QueryNode): Set<string> {
+    switch (node.type) {
+      case "TERM":
+        return this.getDocumentsForTerm(node.value);
+
+      case "AND": {
+        const left = this.evaluateQuery(node.left);
+
+        const right = this.evaluateQuery(node.right);
+
+        return this.intersection(left, right);
+      }
+
+      case "OR": {
+        const left = this.evaluateQuery(node.left);
+
+        const right = this.evaluateQuery(node.right);
+
+        return this.union(left, right);
+      }
+
+      case "NOT": {
+        const child = this.evaluateQuery(node.child);
+
+        return this.difference(this.getAllDocuments(), child);
+      }
+    }
+  }
+
+  searchPhrase(phrase: string): string[] {
+    const terms = this.queryProcessor.processPhrase(phrase);
+
+    if (terms.length === 0) {
+      return [];
+    }
+
+    const firstTerm = terms[0];
+
+    const candidateDocuments = this.positionalIndex.getDocuments(firstTerm);
+
+    const results: string[] = [];
+
+    for (const documentId of candidateDocuments) {
+      const firstPositions = this.positionalIndex.getPositions(
+        firstTerm,
+        documentId
+      );
+
+      for (const startPosition of firstPositions) {
+        let matches = true;
+
+        for (let i = 1; i < terms.length; i++) {
+          const positions = this.positionalIndex.getPositions(
+            terms[i],
+            documentId
+          );
+
+          if (!positions.includes(startPosition + i)) {
+            matches = false;
+            break;
+          }
+        }
+
+        if (matches) {
+          results.push(documentId);
+          break;
+        }
+      }
+    }
+
+    return results;
   }
 }

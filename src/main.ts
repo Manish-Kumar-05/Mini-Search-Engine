@@ -7,6 +7,8 @@ import { removeStopWords } from "./stop-words.js";
 import { SearchEngine } from "./search-engine.js";
 import { precisionAtK } from "./evaluation.js";
 import { QueryProcessor } from "./query-processor.js";
+import { QueryParser } from "./query-parser.js";
+import { PositionalIndex } from "./positional-index.js";
 
 const dataDirectory = path.join(process.cwd(), "data");
 
@@ -15,17 +17,25 @@ const loader = new DocumentLoader(dataDirectory);
 const documents = await loader.loadDocuments();
 const index = new InvertedIndex();
 
+const positionalIndex = new PositionalIndex();
+
 for (const document of documents) {
   const tokens = tokenizer(document.content);
 
   const normalizedTokens = normalizeTokens(tokens);
 
+  // Used for phrase search
+  positionalIndex.addDocument(document.id, normalizedTokens);
+
+  // Used for normal keyword search
   const filteredTokens = removeStopWords(normalizedTokens);
 
   index.addDocument(document.id, filteredTokens);
 }
 
-const searchEngine = new SearchEngine(index);
+const searchEngine = new SearchEngine(index, positionalIndex);
+const queryProcessor = new QueryProcessor();
+const parser = new QueryParser();
 
 const evaluationQueries = [
   {
@@ -41,6 +51,12 @@ const evaluationQueries = [
     relevantDocuments: ["databases.txt"],
   },
 ];
+
+// console.log(searchEngine.searchPhrase("Python"));
+
+// console.log(searchEngine.searchPhrase("machine learning allows"));
+
+// console.log(searchEngine.searchPhrase("programming language"));
 
 // for (const evaluation of evaluationQueries) {
 //   const tfidfResults = searchEngine.searchRanked(evaluation.query);
@@ -70,9 +86,9 @@ const evaluationQueries = [
 //   console.log("BM25 Precision@3:", bm25Precision);
 // }
 
-const queryProcessor = new QueryProcessor();
+// console.log(queryProcessor.process("Python, MACHINE learning!"));
 
-console.log(queryProcessor.process("Python, MACHINE learning!"));
+// console.log(JSON.stringify(parser.parse("python and Machine"), null, 2));
 
 // console.log(searchEngine.searchRanked("python"));
 
@@ -92,13 +108,14 @@ console.log(queryProcessor.process("Python, MACHINE learning!"));
 
 // console.log(searchEngine.searchRanked("javascript database python"));
 
-// console.log(searchEngine.search("python"));
-
-// console.log(searchEngine.search("python AND machine"));
-
-// console.log(searchEngine.search("python OR javascript"));
-
-// console.log(searchEngine.search("python NOT machine"));
+console.log(searchEngine.search("python"));
+console.log(searchEngine.search("python AND machine"));
+console.log(searchEngine.search("python OR javascript"));
+console.log(searchEngine.search("NOT machine"));
+console.log(searchEngine.search("python AND machine AND learning"));
+console.log(searchEngine.search("python OR javascript AND programming")); //Find documents that contain Python, OR documents that contain both JavaScript and programming.
+console.log(searchEngine.search("(python OR javascript) AND machine")); //Find documents that contain machine and also contain either Python or JavaScript.
+console.log(searchEngine.search("python AND NOT javascript"));
 
 // console.log(searchEngine.search("Manish"));
 // console.log(searchEngine.search("   "));

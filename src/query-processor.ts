@@ -14,6 +14,16 @@ export class QueryProcessor {
 
     return removeStopWords(normalizedTokens);
   }
+
+  processPhrase(phrase: string): string[] {
+    if (!phrase.trim()) {
+      return [];
+    }
+
+    const tokens = tokenizer(phrase);
+
+    return normalizeTokens(tokens);
+  }
 }
 
 export type QueryToken =
