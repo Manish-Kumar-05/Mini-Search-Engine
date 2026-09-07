@@ -9,6 +9,9 @@ import { precisionAtK } from "./evaluation.js";
 import { QueryProcessor } from "./query-processor.js";
 import { QueryParser } from "./query-parser.js";
 import { PositionalIndex } from "./positional-index.js";
+import { QueryExpander } from "./query-expander.js";
+import { levenshteinDistance } from "./levenshtein.js";
+import { SpellCorrector } from "./spell-corrector.js";
 
 const dataDirectory = path.join(process.cwd(), "data");
 
@@ -33,7 +36,8 @@ for (const document of documents) {
   index.addDocument(document.id, filteredTokens);
 }
 
-const searchEngine = new SearchEngine(index, positionalIndex);
+const searchEngine = new SearchEngine(index, positionalIndex, documents);
+
 const queryProcessor = new QueryProcessor();
 const parser = new QueryParser();
 
@@ -108,14 +112,18 @@ const evaluationQueries = [
 
 // console.log(searchEngine.searchRanked("javascript database python"));
 
-console.log(searchEngine.search("python"));
-console.log(searchEngine.search("python AND machine"));
-console.log(searchEngine.search("python OR javascript"));
-console.log(searchEngine.search("NOT machine"));
-console.log(searchEngine.search("python AND machine AND learning"));
-console.log(searchEngine.search("python OR javascript AND programming")); //Find documents that contain Python, OR documents that contain both JavaScript and programming.
-console.log(searchEngine.search("(python OR javascript) AND machine")); //Find documents that contain machine and also contain either Python or JavaScript.
-console.log(searchEngine.search("python AND NOT javascript"));
+// console.log(searchEngine.search("python"));
+// console.log(searchEngine.search("python AND machine"));
+// console.log(searchEngine.search("python OR javascript"));
+// console.log(searchEngine.search("NOT machine"));
+// console.log(searchEngine.search("python AND machine AND learning"));
+// console.log(searchEngine.search("python OR javascript AND programming")); //Find documents that contain Python, OR documents that contain both JavaScript and programming.
+// console.log(searchEngine.search("(python OR javascript) AND machine")); //Find documents that contain machine and also contain either Python or JavaScript.
+// console.log(searchEngine.search("python AND NOT javascript"));
+
+const expander = new QueryExpander();
+
+// console.log(expander.expand(["car"]));
 
 // console.log(searchEngine.search("Manish"));
 // console.log(searchEngine.search("   "));
@@ -126,3 +134,46 @@ console.log(searchEngine.search("python AND NOT javascript"));
 // console.log(index.getDocuments("is"));
 
 // console.log(documents);
+
+// console.log(levenshteinDistance("pythn", "python"));
+
+// console.log(levenshteinDistance("javasript", "javascript"));
+
+// console.log(levenshteinDistance("kitten", "sitting"));
+
+// const spellCorrector = new SpellCorrector(index.getTerms());
+
+// console.log(spellCorrector.findClosestTerm("pythn"));
+
+// console.log(spellCorrector.findClosestTerm("javasript"));
+
+// console.log(searchEngine.search("python"));
+
+// console.log(searchEngine.search("pythn"));
+
+// console.log(searchEngine.search("pythn AND machine"));
+
+// console.log(searchEngine.search("javasript"));
+
+const results = searchEngine.searchBM25("javascript");
+
+console.log(results);
+
+const highlighted = searchEngine.highlightResults(results, "javascript");
+
+console.log(highlighted);
+
+const typoResults = searchEngine.searchBM25("pyton");
+
+const typoHighlighted = searchEngine.highlightResults(typoResults, "pyton");
+
+console.log(typoHighlighted);
+
+// const expandedResults = searchEngine.searchBM25("programming");
+
+// const expandedHighlighted = searchEngine.highlightResults(
+//   expandedResults,
+//   "programming"
+// );
+
+// console.log(expandedHighlighted);

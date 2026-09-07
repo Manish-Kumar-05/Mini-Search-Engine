@@ -2,13 +2,16 @@ import { InvertedIndex } from "./inverted-index.js";
 import { tokenizer } from "./tokenizer.js";
 import { normalizeTokens } from "./normalizer.js";
 import { removeStopWords } from "./stop-words.js";
-import { SearchResult } from "./types.js";
+import { Document, HighlightedResult, SearchResult } from "./types.js";
 import { Tfidf } from "./tf-idf.js";
 import { cosineSimilarity } from "./cosine-similarity.js";
 import { BM25 } from "./bm25.js";
 import { QueryProcessor } from "./query-processor.js";
 import { QueryNode, QueryParser } from "./query-parser.js";
 import { PositionalIndex } from "./positional-index.js";
+import { QueryExpander } from "./query-expander.js";
+import { SpellCorrector } from "./spell-corrector.js";
+import { highlightTerms } from "./highlighter.js";
 
 export class SearchEngine {
   private readonly tfidf: Tfidf;
@@ -19,14 +22,39 @@ export class SearchEngine {
 
   private readonly queryParser: QueryParser;
 
+  private readonly queryExpander: QueryExpander;
+
+  private readonly spellCorrector: SpellCorrector;
+
+  private readonly positionalIndex: PositionalIndex;
+
+  private readonly index: InvertedIndex;
+
+  private readonly documents: Map<string, Document>;
+
   constructor(
-    private readonly index: InvertedIndex,
-    private readonly positionalIndex: PositionalIndex
+    index: InvertedIndex,
+    positionalIndex: PositionalIndex,
+    documents: Document[]
   ) {
+    this.index = index;
+    this.positionalIndex = positionalIndex;
+
     this.tfidf = new Tfidf(index);
+
     this.bm25 = new BM25(index);
+
     this.queryProcessor = new QueryProcessor();
+
     this.queryParser = new QueryParser();
+
+    this.queryExpander = new QueryExpander();
+
+    this.spellCorrector = new SpellCorrector(index.getTerms());
+
+    this.documents = new Map(
+      documents.map((document) => [document.id, document])
+    );
   }
 
   // --------------------------------
@@ -40,7 +68,9 @@ export class SearchEngine {
 
     const queryNode = this.queryParser.parse(query);
 
-    return [...this.evaluateQuery(queryNode)];
+    const correctedNode = this.correctQueryNode(queryNode);
+
+    return [...this.evaluateQuery(correctedNode)];
   }
 
   // --------------------------------
@@ -155,14 +185,14 @@ export class SearchEngine {
       return [];
     }
 
+    const correctedTerms = terms.map((term) => this.correctTerm(term));
+
+    const expandedTerms = this.queryExpander.expand(correctedTerms);
+
     const candidateDocuments = new Set<string>();
 
-    // Find documents containing
-    // at least one query term
-    for (const term of terms) {
-      const documents = this.index.getDocuments(term);
-
-      for (const documentId of documents) {
+    for (const term of expandedTerms) {
+      for (const documentId of this.index.getDocuments(term)) {
         candidateDocuments.add(documentId);
       }
     }
@@ -170,11 +200,23 @@ export class SearchEngine {
     const results: SearchResult[] = [];
 
     for (const documentId of candidateDocuments) {
-      const score = this.bm25.calculate(terms, documentId);
+      const bm25Score = this.bm25.calculate(expandedTerms, documentId);
+
+      let exactMatchBoost = 0;
+
+      for (const term of terms) {
+        const frequency = this.index.getTermFrequency(term, documentId);
+
+        if (frequency > 0) {
+          exactMatchBoost += 1;
+        }
+      }
+
+      const finalScore = bm25Score + exactMatchBoost;
 
       results.push({
         documentId,
-        score,
+        score: finalScore,
       });
     }
 
@@ -264,5 +306,70 @@ export class SearchEngine {
     }
 
     return results;
+  }
+
+  private correctTerm(term: string): string {
+    const documents = this.index.getDocuments(term);
+
+    // Exact term exists
+    if (documents.size > 0) {
+      return term;
+    }
+
+    // Try to find a close term
+    return this.spellCorrector.findClosestTerm(term) ?? term;
+  }
+
+  private correctQueryNode(node: QueryNode): QueryNode {
+    switch (node.type) {
+      case "TERM":
+        return {
+          type: "TERM",
+          value: this.correctTerm(node.value),
+        };
+
+      case "AND":
+      case "OR":
+        return {
+          type: node.type,
+          left: this.correctQueryNode(node.left),
+          right: this.correctQueryNode(node.right),
+        };
+
+      case "NOT":
+        return {
+          type: "NOT",
+          child: this.correctQueryNode(node.child),
+        };
+    }
+  }
+
+  highlightResults(
+    results: SearchResult[],
+    query: string
+  ): HighlightedResult[] {
+    const processedTerms = this.queryProcessor.process(query);
+
+    const correctedTerms = processedTerms.map((term) => this.correctTerm(term));
+
+    const expandedTerms = this.queryExpander.expand(correctedTerms);
+
+    return results.map((result) => {
+      const document = this.documents.get(result.documentId);
+
+      if (!document) {
+        return {
+          documentId: result.documentId,
+          score: result.score,
+          snippet: "",
+        };
+      }
+
+      return {
+        documentId: result.documentId,
+        score: result.score,
+        snippet: highlightTerms(document.content, expandedTerms),
+      };
+    });
   }
 }
