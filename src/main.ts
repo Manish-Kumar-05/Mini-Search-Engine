@@ -177,3 +177,27 @@ console.log(typoHighlighted);
 // );
 
 // console.log(expandedHighlighted);
+
+console.log("=== NORMAL ===");
+
+console.log(searchEngine.searchBM25("javascript"));
+
+console.log("=== TYPO ===");
+
+console.log(searchEngine.searchBM25("javasript"));
+
+console.log("=== PHRASE ===");
+
+console.log(searchEngine.searchBM25("machine learning"));
+
+console.log("=== NAME ===");
+
+console.log(searchEngine.searchBM25("python"));
+
+console.log(searchEngine.searchBM25("javascript"));
+
+console.log(searchEngine.searchBM25("javasript"));
+console.log(searchEngine.searchBM25("machine learning"));
+console.log(searchEngine.searchPhrase("used to store"));
+searchEngine.searchBM25("python");
+console.log(searchEngine.searchBM25("python", 3));

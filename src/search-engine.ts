@@ -12,6 +12,7 @@ import { PositionalIndex } from "./positional-index.js";
 import { QueryExpander } from "./query-expander.js";
 import { SpellCorrector } from "./spell-corrector.js";
 import { highlightTerms } from "./highlighter.js";
+import { RANKING_WEIGHTS } from "./ranking-config.js";
 
 export class SearchEngine {
   private readonly tfidf: Tfidf;
@@ -178,14 +179,14 @@ export class SearchEngine {
     return new Set([...first].filter((documentId) => !second.has(documentId)));
   }
 
-  searchBM25(query: string): SearchResult[] {
-    const terms = this.queryProcessor.process(query);
+  searchBM25(query: string, limit = 10): SearchResult[] {
+    const originalTerms = this.queryProcessor.process(query);
 
-    if (terms.length === 0) {
+    if (originalTerms.length === 0) {
       return [];
     }
 
-    const correctedTerms = terms.map((term) => this.correctTerm(term));
+    const correctedTerms = originalTerms.map((term) => this.correctTerm(term));
 
     const expandedTerms = this.queryExpander.expand(correctedTerms);
 
@@ -200,27 +201,21 @@ export class SearchEngine {
     const results: SearchResult[] = [];
 
     for (const documentId of candidateDocuments) {
-      const bm25Score = this.bm25.calculate(expandedTerms, documentId);
-
-      let exactMatchBoost = 0;
-
-      for (const term of terms) {
-        const frequency = this.index.getTermFrequency(term, documentId);
-
-        if (frequency > 0) {
-          exactMatchBoost += 1;
-        }
-      }
-
-      const finalScore = bm25Score + exactMatchBoost;
+      const score = this.calculateFinalScore(
+        query,
+        originalTerms,
+        correctedTerms,
+        expandedTerms,
+        documentId
+      );
 
       results.push({
         documentId,
-        score: finalScore,
+        score,
       });
     }
 
-    return results.sort((a, b) => b.score - a.score);
+    return results.sort((a, b) => b.score - a.score).slice(0, limit);
   }
 
   private getAllDocuments(): Set<string> {
@@ -371,5 +366,114 @@ export class SearchEngine {
         snippet: highlightTerms(document.content, expandedTerms),
       };
     });
+  }
+
+  private hasPhraseMatch(terms: string[], documentId: string): boolean {
+    if (terms.length === 0) {
+      return false;
+    }
+
+    const firstTerm = terms[0];
+
+    const firstPositions = this.positionalIndex.getPositions(
+      firstTerm,
+      documentId
+    );
+
+    for (const startPosition of firstPositions) {
+      let matches = true;
+
+      for (let i = 1; i < terms.length; i++) {
+        const positions = this.positionalIndex.getPositions(
+          terms[i],
+          documentId
+        );
+
+        if (!positions.includes(startPosition + i)) {
+          matches = false;
+          break;
+        }
+      }
+
+      if (matches) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  private calculateNameBoost(terms: string[], documentId: string): number {
+    const document = this.documents.get(documentId);
+
+    if (!document) {
+      return 0;
+    }
+
+    const normalizedName = document.name.toLowerCase();
+
+    let boost = 0;
+
+    for (const term of terms) {
+      if (normalizedName.includes(term.toLowerCase())) {
+        boost += RANKING_WEIGHTS.name;
+      }
+    }
+
+    return boost;
+  }
+
+  private calculateFinalScore(
+    query: string,
+    originalTerms: string[],
+    correctedTerms: string[],
+    expandedTerms: string[],
+    documentId: string
+  ): number {
+    const bm25Score = this.bm25.calculate(expandedTerms, documentId);
+
+    const exactMatchBoost = originalTerms.every((term) =>
+      correctedTerms.includes(term)
+    )
+      ? this.calculateExactMatchBoost(originalTerms, documentId)
+      : 0;
+
+    // Phrase match
+    const phraseTerms = this.getPhraseTerms(query);
+
+    let phraseBoost = 0;
+
+    if (
+      phraseTerms.length > 1 &&
+      this.hasPhraseMatch(phraseTerms, documentId)
+    ) {
+      phraseBoost = RANKING_WEIGHTS.phrase;
+    }
+
+    // Document-name match
+    const nameBoost = this.calculateNameBoost(correctedTerms, documentId);
+
+    return bm25Score + exactMatchBoost + phraseBoost + nameBoost;
+  }
+
+  private calculateExactMatchBoost(
+    terms: string[],
+    documentId: string
+  ): number {
+    let boost = 0;
+
+    for (const term of terms) {
+      const frequency = this.index.getTermFrequency(term, documentId);
+
+      if (frequency > 0) {
+        boost += RANKING_WEIGHTS.exactMatch * Math.log1p(frequency);
+      }
+    }
+
+    return boost;
+  }
+
+  private getPhraseTerms(query: string): string[] {
+    return this.queryProcessor.processPhrase(query);
   }
 }
