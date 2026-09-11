@@ -60,4 +60,40 @@ export class InvertedIndex {
 
     return totalLength / this.documentCount;
   }
+
+  exportState(): {
+    index: [string, [string, number][]][];
+    documentCount: number;
+    documentLengths: [string, number][];
+  } {
+    return {
+      index: Array.from(this.index.entries()).map(
+        ([term, documents]) =>
+          [term, Array.from(documents.entries())] as [
+            string,
+            [string, number][],
+          ]
+      ),
+
+      documentCount: this.documentCount,
+
+      documentLengths: Array.from(this.documentLengths.entries()),
+    };
+  }
+
+  importState(state: {
+    index: [string, [string, number][]][];
+
+    documentCount: number;
+
+    documentLengths: [string, number][];
+  }): void {
+    this.index = new Map(
+      state.index.map(([term, documents]) => [term, new Map(documents)])
+    );
+
+    this.documentCount = state.documentCount;
+
+    this.documentLengths = new Map(state.documentLengths);
+  }
 }

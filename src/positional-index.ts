@@ -24,4 +24,24 @@ export class PositionalIndex {
   getPositions(token: string, documentId: string): number[] {
     return this.index.get(token)?.get(documentId) ?? [];
   }
+
+  exportState(): {
+    index: [string, [string, number[]][]][];
+  } {
+    return {
+      index: Array.from(this.index.entries()).map(
+        ([term, documents]) =>
+          [term, Array.from(documents.entries())] as [
+            string,
+            [string, number[]][],
+          ]
+      ),
+    };
+  }
+
+  importState(state: { index: [string, [string, number[]][]][] }): void {
+    this.index = new Map(
+      state.index.map(([term, documents]) => [term, new Map(documents)])
+    );
+  }
 }
