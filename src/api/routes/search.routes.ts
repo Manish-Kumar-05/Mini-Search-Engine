@@ -2,6 +2,8 @@ import { Router } from "express";
 
 import { SearchEngine } from "../../search-engine.js";
 
+type SearchMode = "bm25" | "boolean" | "phrase";
+
 export function createSearchRouter(searchEngine: SearchEngine): Router {
   const router = Router();
 
@@ -9,9 +11,16 @@ export function createSearchRouter(searchEngine: SearchEngine): Router {
     try {
       const query = String(req.query.q ?? "");
 
+      const mode = String(req.query.mode ?? "bm25") as SearchMode;
+
       const limit = Number(req.query.limit ?? 10);
 
-      // Validate query
+      /*
+                |--------------------------------------------------------------------------
+                | Validate query
+                |--------------------------------------------------------------------------
+                */
+
       if (!query.trim()) {
         return res.status(400).json({
           success: false,
@@ -19,7 +28,28 @@ export function createSearchRouter(searchEngine: SearchEngine): Router {
         });
       }
 
-      // Validate limit
+      /*
+                |--------------------------------------------------------------------------
+                | Validate mode
+                |--------------------------------------------------------------------------
+                */
+
+      const validModes: SearchMode[] = ["bm25", "boolean", "phrase"];
+
+      if (!validModes.includes(mode)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid search mode",
+          validModes,
+        });
+      }
+
+      /*
+                |--------------------------------------------------------------------------
+                | Validate limit
+                |--------------------------------------------------------------------------
+                */
+
       if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
         return res.status(400).json({
           success: false,
@@ -27,10 +57,76 @@ export function createSearchRouter(searchEngine: SearchEngine): Router {
         });
       }
 
-      // Search using BM25
-      const results = searchEngine.searchBM25(query, limit);
+      /*
+                |--------------------------------------------------------------------------
+                | BM25 search
+                |--------------------------------------------------------------------------
+                */
 
-      // Add highlighting
+      if (mode === "bm25") {
+        const results = searchEngine.searchBM25(query, limit);
+
+        const highlightedResults = searchEngine.highlightResults(
+          results,
+          query
+        );
+
+        return res.status(200).json({
+          success: true,
+
+          data: {
+            query,
+            mode,
+            count: highlightedResults.length,
+            results: highlightedResults,
+          },
+        });
+      }
+
+      /*
+                |--------------------------------------------------------------------------
+                | Boolean search
+                |--------------------------------------------------------------------------
+                */
+
+      if (mode === "boolean") {
+        const documentIds = searchEngine.search(query);
+
+        const results = documentIds.slice(0, limit).map((documentId) => ({
+          documentId,
+          score: 1,
+        }));
+
+        const highlightedResults = searchEngine.highlightResults(
+          results,
+          query
+        );
+
+        return res.status(200).json({
+          success: true,
+
+          data: {
+            query,
+            mode,
+            count: highlightedResults.length,
+            results: highlightedResults,
+          },
+        });
+      }
+
+      /*
+                |--------------------------------------------------------------------------
+                | Phrase search
+                |--------------------------------------------------------------------------
+                */
+
+      const documentIds = searchEngine.searchPhrase(query);
+
+      const results = documentIds.slice(0, limit).map((documentId) => ({
+        documentId,
+        score: 1,
+      }));
+
       const highlightedResults = searchEngine.highlightResults(results, query);
 
       return res.status(200).json({
@@ -38,6 +134,7 @@ export function createSearchRouter(searchEngine: SearchEngine): Router {
 
         data: {
           query,
+          mode,
           count: highlightedResults.length,
           results: highlightedResults,
         },
