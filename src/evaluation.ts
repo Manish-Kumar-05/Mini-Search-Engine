@@ -10,11 +10,11 @@ export function precisionAtK(
   relevantDocuments: string[],
   k: number
 ): number {
-  const topResults = results.slice(0, k);
-
-  if (topResults.length === 0) {
+  if (k <= 0 || relevantDocuments.length === 0) {
     return 0;
   }
+
+  const topResults = results.slice(0, k);
 
   let relevantCount = 0;
 
@@ -24,7 +24,7 @@ export function precisionAtK(
     }
   }
 
-  return relevantCount / topResults.length;
+  return relevantCount / k;
 }
 
 export function recallAtK(
@@ -32,11 +32,11 @@ export function recallAtK(
   relevantDocuments: string[],
   k: number
 ): number {
-  const topResults = results.slice(0, k);
-
-  if (relevantDocuments.length === 0) {
+  if (k <= 0 || relevantDocuments.length === 0) {
     return 0;
   }
+
+  const topResults = results.slice(0, k);
 
   let relevantCount = 0;
 
@@ -47,4 +47,20 @@ export function recallAtK(
   }
 
   return relevantCount / relevantDocuments.length;
+}
+
+export function f1AtK(
+  results: SearchResult[],
+  relevantDocuments: string[],
+  k: number
+): number {
+  const precision = precisionAtK(results, relevantDocuments, k);
+
+  const recall = recallAtK(results, relevantDocuments, k);
+
+  if (precision + recall === 0) {
+    return 0;
+  }
+
+  return (2 * (precision * recall)) / (precision + recall);
 }
